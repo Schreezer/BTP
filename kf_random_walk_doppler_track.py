@@ -136,10 +136,8 @@ def estimate_frequency_phase_diff(noisy_signal_complex, dt, fc):
 
 
 # --- Simulation Core Function ---
-def run_kf_simulation(q_fddot_multiplier, R_variance_guess,
-                      q_f_base_mult=1.0, q_fdot_base_mult=1.0, # New base multipliers
-                      waveform_snr_db=10.0):
-    """Runs the KF simulation for given Q/R parameters and returns results."""
+def run_kf_simulation(q_fddot_multiplier, waveform_snr_db=10.0, R_variance_guess=1500**2):
+    """Runs the KF simulation for a given Q multiplier and returns results."""
     # --- Simulation Parameters ---
     data_rate = 16000
     samples_per_bit = 8
@@ -186,11 +184,11 @@ def run_kf_simulation(q_fddot_multiplier, R_variance_guess,
     # Measurement matrix H
     H = np.array([[1.0, 0.0, 0.0]])
 
-    # Process noise Q: Use the provided multipliers
+    # Process noise Q: Use the provided multiplier
     max_f_dddot = A_d * omega_d**3
-    q_fddot_variance = (max_f_dddot * dt)**2 * q_fddot_multiplier # Use passed fddot multiplier
-    q_fdot_base = (1 * dt)**2 * q_fdot_base_mult # Apply fdot base multiplier
-    q_f_base = (1 * dt)**2 * q_f_base_mult     # Apply f base multiplier
+    q_fddot_variance = (max_f_dddot * dt)**2 * q_fddot_multiplier # Use passed multiplier
+    q_fdot_base = (1 * dt)**2
+    q_f_base = (1 * dt)**2
     Q = np.diag([q_f_base, q_fdot_base, q_fddot_variance])
 
     # Measurement noise covariance R: Use the provided guess
@@ -223,13 +221,11 @@ def run_kf_simulation(q_fddot_multiplier, R_variance_guess,
         "noisy_freq_measurements": noisy_freq_measurements,
         "kf_freq_estimates": kf_freq_estimates,
         "fc": fc,
-        "A_d": A_d,
+        "A_d": A_d, # Keep A_d for plotting limits maybe?
         "waveform_snr_db": waveform_snr_db,
         "R": R,
         "Q": Q, # Store Q used for this run
-        "q_fddot_multiplier": q_fddot_multiplier,
-        "q_f_base_mult": q_f_base_mult, # Store base multipliers used
-        "q_fdot_base_mult": q_fdot_base_mult
+        "q_fddot_multiplier": q_fddot_multiplier
     }
     return results
 
@@ -242,11 +238,22 @@ def plot_results(results, model_name="Const Accel", filename="kf_tuning_result.p
     noisy_freq_measurements = results["noisy_freq_measurements"]
     kf_freq_estimates = results["kf_freq_estimates"]
     fc = results["fc"]
-    A_d = results["A_d"]
+    A_d = results["A_d"] # Used for plot limits
     waveform_snr_db = results["waveform_snr_db"]
     R = results["R"]
-    Q = results["Q"] # Get the full Q matrix
-    q_fddot_multiplier = results["q_fddot_multiplier"] # For title maybe
+    q_fddot_multiplier = results["q_fddot_multiplier"]
+
+    # Determine plot limits based on actual frequency range if A_d is not representative
+    freq_min = np.min(true_inst_freq)
+    freq_max = np.max(true_inst_freq)
+    plot_buffer = (freq_max - freq_min) * 0.5 # Add some buffer
+    plot_ymin = (freq_min - plot_buffer) / 1e3
+    plot_ymax = (freq_max + plot_buffer) / 1e3
+    # Fallback if buffer is zero or negative
+    if plot_ymax <= plot_ymin:
+        plot_ymin = (fc - 5000) / 1e3 # Default range if calculation fails
+        plot_ymax = (fc + 5000) / 1e3
+
 
     plt.figure(figsize=(12, 10))
 
@@ -255,13 +262,13 @@ def plot_results(results, model_name="Const Accel", filename="kf_tuning_result.p
     plt.plot(t, true_inst_freq / 1e3, 'g-', label='True Instantaneous Freq (kHz)')
     plt.plot(t, kf_freq_estimates / 1e3, 'r-', linewidth=1.5, label=f'KF {model_name} Estimate (kHz)')
     plt.ylabel('Frequency (kHz)')
-    # More detailed title including base Q terms
-    title = (f'KF ({model_name}) Tracking (SNR={waveform_snr_db:.1f}dB, R={R[0,0]:.1e}, '
-             f'Q=[{Q[0,0]:.1e}, {Q[1,1]:.1e}, {Q[2,2]:.1e}])')
+    title = (f'KF ({model_name}) Tracking (SNR={waveform_snr_db:.1f}dB, R={R[0,0]:.0f}, '
+             f'Q_mult={q_fddot_multiplier:.2e})')
     plt.title(title)
     plt.legend()
     plt.grid(True)
-    plt.ylim((fc - 1.5*A_d)/1e3, (fc + 1.5*A_d)/1e3)
+    # plt.ylim((fc - 1.5*A_d)/1e3, (fc + 1.5*A_d)/1e3) # Original ylim
+    plt.ylim(plot_ymin, plot_ymax) # Use dynamic ylim
     plt.xticks([])
 
     # Middle plot: KF Estimation Error
@@ -282,7 +289,8 @@ def plot_results(results, model_name="Const Accel", filename="kf_tuning_result.p
     plt.title('Frequency Estimator Output vs. True Frequency')
     plt.legend()
     plt.grid(True)
-    plt.ylim((fc - 1.5*A_d)/1e3, (fc + 1.5*A_d)/1e3)
+    # plt.ylim((fc - 1.5*A_d)/1e3, (fc + 1.5*A_d)/1e3) # Original ylim
+    plt.ylim(plot_ymin, plot_ymax) # Use dynamic ylim
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.97])
     plt.savefig(filename)
@@ -290,30 +298,39 @@ def plot_results(results, model_name="Const Accel", filename="kf_tuning_result.p
     # plt.show() # Usually disabled during tuning
 
 
-# --- Base Q_f Tuning Function ---
-def tune_q_f_base_multiplier(fixed_q_fddot_mult, fixed_R_var, fixed_q_fdot_base_mult,
-                             num_iterations=50, start_multiplier=1.0):
-    """Tunes the q_f_base_mult by minimizing max error after t=2s."""
-    print(f"--- Starting Q_f_base Tuning ({num_iterations} iterations, fixed Qddot={fixed_q_fddot_mult:.1e}, R={fixed_R_var:.1e}, Qdot_base={fixed_q_fdot_base_mult:.1e}) ---")
-    # Search space around 1.0 (e.g., 0.01 to 100)
-    if start_multiplier <= 0: start_multiplier = 1.0
+# --- Q Tuning Function ---
+def tune_q_fddot_multiplier(num_iterations=50, start_multiplier=0.22, fixed_R_variance=1500**2, **kwargs):
+    """Tunes the q_fddot_multiplier by minimizing max error after t=2s, using a fixed R variance."""
+    print(f"--- Starting Q Tuning ({num_iterations} iterations, fixed R_var={fixed_R_variance:.3e}) ---")
+    # Define search space (logarithmic around start_multiplier)
+    # e.g., from start/100 to start*100
+    # Ensure start_multiplier is positive before log10
+    if start_multiplier <= 0:
+        print("Warning: start_multiplier must be positive for logspace search. Using default 0.01.")
+        start_multiplier = 0.01
     min_log_mult = np.log10(start_multiplier / 100)
     max_log_mult = np.log10(start_multiplier * 100)
     multipliers_to_test = np.logspace(min_log_mult, max_log_mult, num_iterations)
 
     best_multiplier_in_run = None
     min_max_error_in_run = float('inf')
+
+    # Base parameters (could be passed as args if needed)
     waveform_snr_db = 10.0
+    # R_variance_guess is now fixed for this tuning run
+    R_variance_guess = fixed_R_variance
 
     for i, multiplier in enumerate(multipliers_to_test):
+        # Run simulation with current multiplier and fixed R
+        # Pass through any extra kwargs (like random_walk_std_dev)
         results = run_kf_simulation(
-            q_fddot_multiplier=fixed_q_fddot_mult,
-            R_variance_guess=fixed_R_var,
-            q_f_base_mult=multiplier, # Tune this
-            q_fdot_base_mult=fixed_q_fdot_base_mult, # Keep fixed
-            waveform_snr_db=waveform_snr_db
+            q_fddot_multiplier=multiplier,
+            waveform_snr_db=waveform_snr_db,
+            R_variance_guess=R_variance_guess, # Use fixed R
+            **kwargs
         )
-        # Calculate performance metric
+
+        # Calculate performance metric (max error after t=2s)
         t = results["t"]
         kf_freq_estimates = results["kf_freq_estimates"]
         true_inst_freq = results["true_inst_freq"]
@@ -323,140 +340,26 @@ def tune_q_f_base_multiplier(fixed_q_fddot_mult, fixed_R_var, fixed_q_fdot_base_
             abs_error = np.abs(kf_freq_estimates[indices] - true_inst_freq[indices])
             current_max_error = np.max(abs_error)
         else:
-            current_max_error = float('inf')
-        # Update best result
+            current_max_error = float('inf') # Handle case where duration < 2s
+
+        # print(f"Iter {i+1}/{num_iterations}: Q_mult={multiplier:.3e} -> Max Error (t>=2s)={current_max_error/1e3:.4f} kHz") # Optional: reduce verbosity
+
+        # Update best result for this run
         if current_max_error < min_max_error_in_run:
             min_max_error_in_run = current_max_error
             best_multiplier_in_run = multiplier
 
-    print(f"--- Q_f_base Tuning Run Complete ---")
+    print(f"--- Q Tuning Run Complete ---")
     if best_multiplier_in_run is not None:
-        print(f"Best Q_f_base Multiplier: {best_multiplier_in_run:.3e} (Error: {min_max_error_in_run/1e3:.4f} kHz)")
+        print(f"Best Q Multiplier in run: {best_multiplier_in_run:.3e} (Error: {min_max_error_in_run/1e3:.4f} kHz)")
     else:
-        print("No best Q_f_base multiplier found.")
-    return best_multiplier_in_run, min_max_error_in_run
+        print("No best Q multiplier found in this run.")
 
-# --- Base Q_fdot Tuning Function ---
-def tune_q_fdot_base_multiplier(fixed_q_fddot_mult, fixed_R_var, fixed_q_f_base_mult,
-                                num_iterations=50, start_multiplier=1.0):
-    """Tunes the q_fdot_base_mult by minimizing max error after t=2s."""
-    print(f"--- Starting Q_fdot_base Tuning ({num_iterations} iterations, fixed Qddot={fixed_q_fddot_mult:.1e}, R={fixed_R_var:.1e}, Q_base={fixed_q_f_base_mult:.1e}) ---")
-    # Search space around 1.0 (e.g., 0.01 to 100)
-    if start_multiplier <= 0: start_multiplier = 1.0
-    min_log_mult = np.log10(start_multiplier / 100)
-    max_log_mult = np.log10(start_multiplier * 100)
-    multipliers_to_test = np.logspace(min_log_mult, max_log_mult, num_iterations)
-
-    best_multiplier_in_run = None
-    min_max_error_in_run = float('inf')
-    waveform_snr_db = 10.0
-
-    for i, multiplier in enumerate(multipliers_to_test):
-        results = run_kf_simulation(
-            q_fddot_multiplier=fixed_q_fddot_mult,
-            R_variance_guess=fixed_R_var,
-            q_f_base_mult=fixed_q_f_base_mult, # Keep fixed
-            q_fdot_base_mult=multiplier, # Tune this
-            waveform_snr_db=waveform_snr_db
-        )
-        # Calculate performance metric
-        t = results["t"]
-        kf_freq_estimates = results["kf_freq_estimates"]
-        true_inst_freq = results["true_inst_freq"]
-        indices = np.where(t >= 2.0)[0]
-        if len(indices) > 0:
-            abs_error = np.abs(kf_freq_estimates[indices] - true_inst_freq[indices])
-            current_max_error = np.max(abs_error)
-        else:
-            current_max_error = float('inf')
-        # Update best result
-        if current_max_error < min_max_error_in_run:
-            min_max_error_in_run = current_max_error
-            best_multiplier_in_run = multiplier
-
-    print(f"--- Q_fdot_base Tuning Run Complete ---")
-    if best_multiplier_in_run is not None:
-        print(f"Best Q_fdot_base Multiplier: {best_multiplier_in_run:.3e} (Error: {min_max_error_in_run/1e3:.4f} kHz)")
-    else:
-        print("No best Q_fdot_base multiplier found.")
     return best_multiplier_in_run, min_max_error_in_run
 
 
-# --- Main Execution ---
-if __name__ == "__main__":
-    # Fixed parameters from previous Q/R tuning
-    fixed_q_fddot_mult = 2.917e-01
-    fixed_r_var = 2.983e+06
-    print(f"--- Using Fixed Parameters: Qddot_mult={fixed_q_fddot_mult:.3e}, R_var={fixed_r_var:.3e} ---")
-
-    num_base_tuning_cycles = 2 # Number of Q_f -> Q_fdot cycles
-    num_iterations_per_cycle = 50 # Iterations for each base Q search
-
-    # Initial guesses for base multipliers
-    current_best_q_f_mult = 1.0
-    current_best_q_fdot_mult = 1.0
-    overall_best_q_f_mult = current_best_q_f_mult
-    overall_best_q_fdot_mult = current_best_q_fdot_mult
-    overall_min_error = float('inf') # Track error with tuned base Q
-
-    print(f"\n--- Starting Base Q Iterative Tuning ({num_base_tuning_cycles} cycles) ---")
-
-    for cycle in range(num_base_tuning_cycles):
-        print(f"\n=== Base Q Tuning Cycle {cycle + 1}/{num_base_tuning_cycles} ===")
-
-        # --- Tune Q_f_base (fixing Q_fdot_base) ---
-        q_f_mult_result, q_f_error = tune_q_f_base_multiplier(
-            fixed_q_fddot_mult=fixed_q_fddot_mult,
-            fixed_R_var=fixed_r_var,
-            fixed_q_fdot_base_mult=current_best_q_fdot_mult, # Use current fdot
-            num_iterations=num_iterations_per_cycle,
-            start_multiplier=current_best_q_f_mult # Start near current best
-        )
-        if q_f_mult_result is not None:
-            current_best_q_f_mult = q_f_mult_result # Update for next stage
-
-        # --- Tune Q_fdot_base (fixing Q_f_base) ---
-        q_fdot_mult_result, q_fdot_error = tune_q_fdot_base_multiplier(
-            fixed_q_fddot_mult=fixed_q_fddot_mult,
-            fixed_R_var=fixed_r_var,
-            fixed_q_f_base_mult=current_best_q_f_mult, # Use updated f
-            num_iterations=num_iterations_per_cycle,
-            start_multiplier=current_best_q_fdot_mult # Start near current best
-        )
-        if q_fdot_mult_result is not None:
-            current_best_q_fdot_mult = q_fdot_mult_result # Update for next cycle
-
-        # Track overall best result (using error from the Q_fdot tuning stage)
-        current_cycle_error = q_fdot_error if q_fdot_error is not None else float('inf')
-        if current_cycle_error < overall_min_error:
-            overall_min_error = current_cycle_error
-            overall_best_q_f_mult = current_best_q_f_mult
-            overall_best_q_fdot_mult = current_best_q_fdot_mult
-            print(f"*** New overall best base Q found in Cycle {cycle + 1}: Q_f={overall_best_q_f_mult:.3e}, Q_fdot={overall_best_q_fdot_mult:.3e}, Error={overall_min_error/1e3:.4f} kHz ***")
-
-    print(f"\n--- Base Q Iterative Tuning Complete ---")
-    print(f"Overall Best Q_f_base Multiplier: {overall_best_q_f_mult:.3e}")
-    print(f"Overall Best Q_fdot_base Multiplier: {overall_best_q_fdot_mult:.3e}")
-    print(f"Overall Minimum Max Error (t>=2s): {overall_min_error/1e3:.4f} kHz")
-
-    # --- Run final simulation with fixed Qddot/R and tuned base Q multipliers ---
-    print("\n--- Running final simulation with tuned base Q multipliers ---")
-    final_results = run_kf_simulation(
-        q_fddot_multiplier=fixed_q_fddot_mult,
-        R_variance_guess=fixed_r_var,
-        q_f_base_mult=overall_best_q_f_mult,
-        q_fdot_base_mult=overall_best_q_fdot_mult
-    )
-
-    # --- Plot final results ---
-    plot_results(final_results,
-                 model_name=f"Const Accel (Tuned Base Q - {num_base_tuning_cycles} cycles)",
-                 filename="kf_realistic_noise_track_tuned_baseQ.png")
-    plt.show() # Show the final plot
 # --- R Tuning Function ---
-# This function is no longer called directly in the main block for base Q tuning,
-# but kept here in case needed later or for reference.
-def tune_R_variance(fixed_q_multiplier, num_iterations=50, start_R_variance=1500**2):
+def tune_R_variance(fixed_q_multiplier, num_iterations=50, start_R_variance=1500**2, **kwargs):
     """Tunes the R_variance_guess by minimizing max error after t=2s, using a fixed Q multiplier."""
     print(f"--- Starting R Tuning ({num_iterations} iterations, fixed Q_mult={fixed_q_multiplier:.3e}) ---")
     # Define search space (logarithmic around start_R_variance)
@@ -477,22 +380,18 @@ def tune_R_variance(fixed_q_multiplier, num_iterations=50, start_R_variance=1500
 
     for i, R_var in enumerate(R_variances_to_test):
         # Run simulation with fixed Q multiplier and current R variance
-        # Need to decide which base Q multipliers to use here if called independently
-        # Defaulting to 1.0 for now if this function were called standalone
+        # Pass through any extra kwargs (like random_walk_std_dev)
         results = run_kf_simulation(
             q_fddot_multiplier=fixed_q_multiplier, # Use fixed Q
             waveform_snr_db=waveform_snr_db,
             R_variance_guess=R_var, # Test this R
-            q_f_base_mult=1.0, # Assuming default if called standalone
-            q_fdot_base_mult=1.0 # Assuming default if called standalone
+            **kwargs
         )
 
         # Calculate performance metric (max error after t=2s)
-
         t = results["t"]
         kf_freq_estimates = results["kf_freq_estimates"]
         true_inst_freq = results["true_inst_freq"]
-
 
         indices = np.where(t >= 2.0)[0]
         if len(indices) > 0:
@@ -515,3 +414,64 @@ def tune_R_variance(fixed_q_multiplier, num_iterations=50, start_R_variance=1500
         print("No best R variance found in this run.")
 
     return best_R_variance_in_run, min_max_error_in_run
+
+
+# --- Main Execution ---
+if __name__ == "__main__":
+    num_tuning_cycles = 2 # Number of Q -> R cycles
+    num_iterations_per_cycle = 50 # Iterations for each Q or R search
+
+    # Initial guesses
+    current_best_q_mult = 0.22 # Start with the value from the prompt
+    current_best_r_var = 1500**2 # Default R variance
+    overall_best_q_mult = current_best_q_mult
+    overall_best_r_var = current_best_r_var
+    overall_min_error = float('inf')
+
+    print(f"--- Starting Iterative Tuning ({num_tuning_cycles} cycles) ---")
+
+    for cycle in range(num_tuning_cycles):
+        print(f"\n=== Tuning Cycle {cycle + 1}/{num_tuning_cycles} ===")
+
+        # --- Tune Q (fixing R) ---
+        q_mult_result, q_error = tune_q_fddot_multiplier(
+            num_iterations=num_iterations_per_cycle,
+            start_multiplier=current_best_q_mult, # Start search near current best
+            fixed_R_variance=current_best_r_var
+        )
+        if q_mult_result is not None:
+            current_best_q_mult = q_mult_result # Update Q for next R tuning
+
+        # --- Tune R (fixing Q) ---
+        r_var_result, r_error = tune_R_variance(
+            fixed_q_multiplier=current_best_q_mult, # Use newly tuned Q
+            num_iterations=num_iterations_per_cycle,
+            start_R_variance=current_best_r_var # Start search near current best
+        )
+        if r_var_result is not None:
+            current_best_r_var = r_var_result # Update R for next Q tuning
+
+        # Track overall best result (using the error from the R tuning stage of the cycle)
+        current_cycle_error = r_error if r_error is not None else float('inf')
+        if current_cycle_error < overall_min_error:
+            overall_min_error = current_cycle_error
+            overall_best_q_mult = current_best_q_mult
+            overall_best_r_var = current_best_r_var
+            print(f"*** New overall best found in Cycle {cycle + 1}: Q={overall_best_q_mult:.3e}, R={overall_best_r_var:.3e}, Error={overall_min_error/1e3:.4f} kHz ***")
+
+
+    print(f"\n--- Iterative Tuning Complete ---")
+    print(f"Overall Best Q Multiplier: {overall_best_q_mult:.3e}")
+    print(f"Overall Best R Variance: {overall_best_r_var:.3e}")
+    print(f"Overall Minimum Max Error (t>=2s): {overall_min_error/1e3:.4f} kHz")
+
+    # --- Run final simulation with overall best Q and R ---
+    print("\n--- Running final simulation with overall best tuned Q and R ---")
+    final_results = run_kf_simulation(q_fddot_multiplier=overall_best_q_mult,
+                                      R_variance_guess=overall_best_r_var)
+
+    # --- Plot final results ---
+    plot_results(final_results,
+                 model_name=f"Const Accel (Iteratively Tuned Q&R - {num_tuning_cycles} cycles)",
+                 filename="kf_realistic_noise_track_iter_tuned.png")
+    plt.show() # Show the final plot
