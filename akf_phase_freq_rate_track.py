@@ -142,7 +142,7 @@ def estimate_phase_difference(noisy_signal_complex):
 
 
 # --- Simulation Core Function ---
-def run_akf_simulation(waveform_snr_db=10.0):
+def run_akf_simulation(waveform_snr_db=15):
     """Runs the AKF simulation with fixed parameters."""
     # --- Simulation Parameters ---
     data_rate = 16000
@@ -205,7 +205,7 @@ def run_akf_simulation(waveform_snr_db=10.0):
     max_freq_jerk = A_d * omega_d**2
     q_freqrate_var = (max_freq_jerk * dt)**2 * 0.1 # Example value
     q_freqshift_var = (100 * dt)**2 # Example value (Hz^2)
-    q_phasediff_var = (0.1 * dt)**2 # Example value (rad^2) - driven by freq noise mostly
+    q_phasediff_var = (0.5 * dt)**2 # Example value (rad^2) - driven by freq noise mostly
     Q = np.diag([q_phasediff_var, q_freqshift_var, q_freqrate_var])
     print(f"Using fixed Q = diag([{Q[0,0]:.2e}, {Q[1,1]:.2e}, {Q[2,2]:.2e}])")
 
@@ -273,7 +273,7 @@ def run_akf_simulation(waveform_snr_db=10.0):
 
 
 # --- Plotting Function ---
-def plot_results(results, model_name="Phase/Freq/Rate KF", filename="akf_phase_freq_rate_track.png"):
+def plot_results(results, model_name="Phase/Freq/Rate KF", filename="plots/akf_phase_freq_rate_track.png"):
     """Generates plots for the phase/frequency/rate KF results."""
     t = results["t"]
     true_phase_diff = results["true_phase_diff"]
@@ -333,10 +333,14 @@ def plot_results(results, model_name="Phase/Freq/Rate KF", filename="akf_phase_f
     freq_shift_error = (kf_freq_shift_est - true_freq_shift) / 1e3 # kHz
     freq_rate_error = (kf_freq_rate_est - true_freq_rate) / 1e3 # kHz/s
 
-    plt.plot(t, phase_error, 'm-', label=f'Phase Diff Error (rad)')
-    plt.plot(t, freq_shift_error, 'c-', label=f'Freq Shift Error (kHz)')
-    plt.plot(t, freq_rate_error, 'y-', label=f'Freq Rate Error (kHz/s)')
-    plt.xlabel('Time (s)')
+    # --- Filter data for error plot (t >= 0.5s) ---
+    error_plot_start_time = 0.5
+    mask = t >= error_plot_start_time
+
+    plt.plot(t[mask], phase_error[mask], 'm-', label=f'Phase Diff Error (rad)')
+    plt.plot(t[mask], freq_shift_error[mask], 'c-', label=f'Freq Shift Error (kHz)')
+    plt.plot(t[mask], freq_rate_error[mask], 'y-', label=f'Freq Rate Error (kHz/s)')
+    plt.xlabel(f'Time (s) [Starting from {error_plot_start_time}s]')
     plt.ylabel('Estimation Error')
     plt.legend(loc='upper left')
     plt.grid(True)
@@ -365,7 +369,7 @@ if __name__ == "__main__":
     # --- Plot final results ---
     plot_results(final_results,
                  model_name=f"AKF Phase/Freq/Rate (SNR={simulation_snr_db}dB)",
-                 filename=f"akf_phase_freq_rate_track_snr{int(simulation_snr_db)}db.png")
+                 filename=f"plots/akf_phase_freq_rate_track_snr{int(simulation_snr_db)}db.png")
 
     print("--- Simulation Complete ---")
     plt.show() # Show the final plot interactively

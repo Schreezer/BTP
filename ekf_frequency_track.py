@@ -276,8 +276,8 @@ def main_ekf_frequency_tracking():
     plt.grid(True)
     plt.tight_layout()
 
-    plt.savefig('ekf_frequency_track.png')
-    print("Plot saved to ekf_frequency_track.png")
+    plt.savefig('plots/ekf_frequency_track.png')
+    print("Plot saved to plots/ekf_frequency_track.png")
     plt.show() # Display interactive plot window
 
 if __name__ == "__main__":

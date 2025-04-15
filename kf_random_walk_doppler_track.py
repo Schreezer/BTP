@@ -231,7 +231,7 @@ def run_kf_simulation(q_fddot_multiplier, waveform_snr_db=10.0, R_variance_guess
 
 
 # --- Plotting Function ---
-def plot_results(results, model_name="Const Accel", filename="kf_tuning_result.png"):
+def plot_results(results, model_name="Const Accel", filename="plots/kf_tuning_result.png"):
     """Generates the standard 3-panel plot from simulation results."""
     t = results["t"]
     true_inst_freq = results["true_inst_freq"]
@@ -473,5 +473,5 @@ if __name__ == "__main__":
     # --- Plot final results ---
     plot_results(final_results,
                  model_name=f"Const Accel (Iteratively Tuned Q&R - {num_tuning_cycles} cycles)",
-                 filename="kf_realistic_noise_track_iter_tuned.png")
+                 filename="plots/kf_realistic_noise_track_iter_tuned.png")
     plt.show() # Show the final plot

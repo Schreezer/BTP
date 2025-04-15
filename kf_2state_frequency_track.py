@@ -226,8 +226,8 @@ def main_kf_2state_frequency_tracking():
     plt.grid(True)
     plt.tight_layout()
 
-    plt.savefig('kf_2state_frequency_track.png')
-    print("Plot saved to kf_2state_frequency_track.png")
+    plt.savefig('plots/kf_2state_frequency_track.png')
+    print("Plot saved to plots/kf_2state_frequency_track.png")
     plt.show() # Display interactive plot window
 
 if __name__ == "__main__":

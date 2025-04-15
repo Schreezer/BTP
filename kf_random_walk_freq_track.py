@@ -288,8 +288,8 @@ def main_frequency_tracking():
     plt.grid(True)
     plt.tight_layout() # Adjust spacing between plots
 
-    plt.savefig('kalman_filter_frequency_track.png')
-    print("Plot saved to kalman_filter_frequency_track.png")
+    plt.savefig('plots/random_walk_freq_track.png')
+    print("Plot saved to plots/random_walk_freq_track.png")
     plt.show() # Display interactive plot window
 
 if __name__ == "__main__":
