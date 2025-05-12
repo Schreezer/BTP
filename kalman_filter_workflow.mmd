@@ -1,43 +1,22 @@
-flowchart TD
-    A[Start: BPSK Signal with Doppler Shift] --> B[Kalman Filter Implementations]
+graph TD
+    A[2-State KF with Harmonic Model] -->|"Removes harmonic oscillator<br/>Adds constant velocity model<br/>Adds SNR-based noise config"| B[KF with Constant Velocity]
+    B -->|"Adds 3rd state f_ddot<br/>Adds complex signal processing<br/>Adds parameter optimization"| C[3-State KF with Realistic Noise]
+    C -->|"Adds state constraints<br/>Adds BER analysis"| D[KF with State Constraints]
+    D -->|"Implements adaptive methods<br/>Adds innovation-based weighting"| E[Sage-Husa and WAF]
 
-    B --> C1[2-State KF: Harmonic Oscillator]
-    C1 --> C1a[State: [f-fc, f_dot]']
-    C1 --> C1b[Linear Model, Fixed F]
-    C1 --> C1c[Direct Frequency Measurement]
-    C1 --> C1d[Testing: Not Realistic, Good Performance]
+    %% Implementation details
+    A1["• Pre-computed F matrix<br/>• Uses harmonic oscillator model<br/>• Simple linear measurement"] --> A
+    B1["• Fixed state transition matrix<br/>• SNR-based noise (11dB)<br/>• High uncertainty in acceleration"] --> B
+    C1["• Hierarchical Q tuning<br/>• Complex BPSK processing<br/>• Iterative parameter optimization"] --> C
+    D1["• Physical constraints on freq<br/>• Signal reconstruction<br/>• Performance tracking"] --> D
+    E1["• Adaptive noise estimation<br/>• Better error handling<br/>• Improved tracking stability"] --> E
 
-    B --> C2[2-State KF: Constant Velocity]
-    C2 --> C2a[State: [f, f_dot]']
-    C2 --> C2b[Constant Velocity Model, F = [[1,dt],[0,1]]]
-    C2 --> C2c[Known Frequency in Measurement]
-    C2 --> C2d[SNR-based Noise, Tuned Q]
+    %% Style definitions
+    classDef default fill:#f9f9f9,stroke:#333,stroke-width:2px
+    classDef main fill:#e1f3d8,stroke:#82c91e,stroke-width:2px
+    classDef features fill:#fff3bf,stroke:#fab005,stroke-width:2px
+    classDef removed fill:#ffe3e3,stroke:#fa5252,stroke-width:2px,stroke-dasharray: 5 5
 
-    B --> C3[3-State KF: Realistic Noise]
-    C3 --> C3a[State: [f, f_dot, f_ddot]']
-    C3 --> C3b[Phase Diff from BPSK]
-    C3 --> C3c[Hierarchical Q Tuning]
-    C3 --> C3d[Iterative Parameter Optimization]
-    C3 --> C3e[SNR-based AWGN]
-
-    B --> C4[3-State KF: State Constraints & BER]
-    C4 --> C4a[State: [phase_diff, freq_shift, freq_rate]']
-    C4 --> C4b[Physical Constraints]
-    C4 --> C4c[SNR-based Noise]
-    C4 --> C4d[Signal Reconstruction]
-    C4 --> C4e[BER Analysis]
-
-    B --> D[Comparative Analysis]
-    D --> D1[Model Complexity: 2-state → 3-state, Linear → Adaptive]
-    D --> D2[Performance: Simpler = Faster, Complex = Accurate]
-    D --> D3[Signal Processing: Frequency → Phase/Complex]
-    D --> D4[Parameter Tuning: Q/R Optimization]
-    D --> D5[Noise Handling: Simple → Realistic AWGN]
-    D --> D6[AKF: Best Tracking, BER Impact]
-
-    B --> E[MATLAB Adaptive Filters]
-    E --> E1[Sage-Husa Adaptive KF]
-    E1 --> E1a[Adaptive Q/R, Forgetting Factor]
-    E --> E2[Weighted Adaptive KF (WAF)]
-    E2 --> E2a[Innovation-based Weighting, UD Factorization]
-    E --> E3[Performance: Tracking, BER, RMSE]
+    %% Apply styles
+    class A,B,C,D,E main
+    class A1,B1,C1,D1,E1 features

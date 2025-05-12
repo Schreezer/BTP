@@ -7,6 +7,18 @@ This repository contains implementations of various Kalman Filter (KF) approache
 
 The project explores different state-space models and filtering techniques to track frequency variations in a BPSK signal affected by sinusoidal Doppler shift. The implementations progress from simple to more complex models, with increasingly realistic noise simulation and parameter tuning approaches.
 
+## Implementation Workflow
+
+The project's implementation progression is visualized in `kalman_filter_workflow.png`, showing how different Kalman Filter implementations evolved:
+
+1. Started with a 2-State KF using a harmonic oscillator model
+2. Transitioned to a constant velocity model with SNR-based noise configuration
+3. Enhanced to a 3-State KF with realistic noise and complex signal processing
+4. Added state constraints and BER analysis
+5. Finally implemented adaptive methods with Sage-Husa and WAF
+
+Each stage brought specific improvements and features, making the implementation progressively more sophisticated and realistic.
+
 ## Implementation Variants
 
 ### Harmonic Oscillator Models
@@ -73,8 +85,10 @@ Key configurable parameters across implementations:
 
 The repository contains:
 - Individual implementation files for each model variant
+- A comprehensive project report (`BTP.pdf`) detailing the theoretical background, implementation details, and results analysis
 - A memory bank file (`project_memory_bank.md`) documenting the development process
 - Generated plots in the `plots/` directory (not included in repository)
+- A visual workflow diagram (`kalman_filter_workflow.png`) showing the evolution of implementations
 
 ## Future Work
 
