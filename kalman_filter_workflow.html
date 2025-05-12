@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Kalman Filter Workflow</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+    <style>
+        .mermaid {
+            width: 100%;
+            max-width: 1600px; /* Increased from 1200px */
+            margin: 0 auto;
+            overflow: visible;
+        }
+        body {
+            margin: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="mermaid">
+    flowchart TD
+        classDef standard fill:#f9f7ff,stroke:#333,stroke-width:1px,width:300px
+        classDef decision fill:#e6e6ff,stroke:#333,stroke-width:1px,shape:diamond,width:250px
+        classDef container fill:#ffffcc,stroke:#333,stroke-width:1px
+        classDef conclusion fill:white,stroke:#333,stroke-width:1px,width:350px
+        
+        %% Set minimum node width to prevent text cutoff
+        %% Also adding numbered labels to ensure proper spacing
+
+        A["Start: Kalman Filter Analysis<br/>for Frequency Tracking"] --> B{"Initial Python<br/>Implementations"}
+
+        subgraph Python_Filters["Python Filters"]
+            direction TB
+            style Python_Filters fill:#ffffcc,stroke:#333,stroke-width:1px,padding:20px
+
+            C["1. Simple 2-State KF<br/>(kf_2state_frequency_track.py)<br/>Model: f-fc, f_dot<br/>Linear Harmonic Oscillator"]
+            D["2. Constant Velocity KF<br/>(kf_const_vel_freq_track.py)<br/>Model: f, f_dot<br/>Simpler Linear Model"]
+            E["3. Extended Kalman Filter<br/>(ekf_frequency_track.py)<br/>Model: f-fc, f_dot<br/>Non-linear Sinusoidal Model"]
+            F{"Advanced Python<br/>Models 3-State"}
+            G["4. Random Walk Doppler KF<br/>(kf_random_walk_doppler_track)<br/>Model: phase_diff, freq_shift,<br/>freq_rate<br/>Complex Signals, Const. Accel."]
+            H["5. KF with Realistic Noise<br/>(kf_realistic_noise_track)<br/>Model: f, f_dot, f_ddot<br/>Complex Signals, SNR-based<br/>Noise, Q Tuning"]
+            I{"Adaptive Python<br/>Models"}
+            J["6. Adaptive KF AKF<br/>(akf_phase_freq_rate_track)<br/>Model: phase_diff, freq_shift,<br/>freq_rate<br/>State Constraints, SNR-based R"]
+            K["7. Sage-Husa KF<br/>(sage_husa_phase_freq_rate)<br/>Model: phase_diff, freq_shift,<br/>freq_rate<br/>Adaptive Q/R Estimation"]
+            
+            B --> C
+            B --> D
+            B --> E
+            C --> F
+            D --> F
+            E --> F
+            F --> G
+            F --> H
+            G --> I
+            H --> I
+            I --> J
+            I --> K
+        end
+
+        K --> L{"Transition to MATLAB for<br/>Advanced Adaptive Filters"}
+
+        subgraph MATLAB_Filters["MATLAB Filters"]
+            direction TB
+            style MATLAB_Filters fill:#ffffcc,stroke:#333,stroke-width:1px,padding:20px
+            
+            M["8. Sage-Husa Adaptive KF<br/>Model: doppler_freq,<br/>doppler_rate<br/>Adaptive Q/R Forgetting Factor"]
+            N["9. Weighted Adaptive Filter<br/>Model: doppler_freq,<br/>doppler_rate<br/>UD Factorization,<br/>Innovation Weighting for R"]
+
+            L --> M
+            L --> N
+        end
+
+        M --> O["Conclusion: Compared Sage-Husa & WAF<br/>in MATLAB under low SNR"]
+        N --> O
+
+        %% Apply classes to nodes
+        class A standard
+        class B,F,I,L decision
+        class C,D,E,G,H,J,K,M,N standard
+        class O conclusion
+    </div>
+
+    <div style="text-align: center; margin: 20px;">
+        <button id="downloadBtn" style="padding: 10px 20px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">Download as PNG</button>
+    </div>
+    
+    <script>
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            securityLevel: 'loose',
+            flowchart: {
+                useMaxWidth: true,
+                htmlLabels: true,
+                curve: 'basis',
+                diagramPadding: 20,
+                nodeSpacing: 80,
+                rankSpacing: 150,
+                wrappingWidth: 200
+            }
+        });
+        
+        document.getElementById('downloadBtn').addEventListener('click', function() {
+            // Create a status indicator
+            const statusDiv = document.createElement('div');
+            statusDiv.style.margin = '10px';
+            statusDiv.textContent = 'Preparing image...';
+            this.after(statusDiv);
+            
+            setTimeout(() => {
+                try {
+                    // Get the SVG element with better selector
+                    const svgElement = document.querySelector('.mermaid svg');
+                    
+                    if (!svgElement) {
+                        throw new Error('SVG element not found');
+                    }
+                    
+                    // Clone the SVG to avoid modifying the original
+                    const clonedSvg = svgElement.cloneNode(true);
+                    
+                    // Get dimensions - use getBoundingClientRect for more accurate size
+                    const bbox = svgElement.getBoundingClientRect();
+                    const width = Math.ceil(bbox.width);
+                    const height = Math.ceil(bbox.height);
+                    
+                    // Set explicit dimensions to the clone
+                    clonedSvg.setAttribute('width', width);
+                    clonedSvg.setAttribute('height', height);
+                    
+                    // Add white background
+                    const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    bgRect.setAttribute('width', '100%');
+                    bgRect.setAttribute('height', '100%');
+                    bgRect.setAttribute('fill', 'white');
+                    clonedSvg.insertBefore(bgRect, clonedSvg.firstChild);
+                    
+                    // Convert SVG to string and create a blob
+                    const serializer = new XMLSerializer();
+                    const svgString = serializer.serializeToString(clonedSvg);
+                    const svg64 = btoa(unescape(encodeURIComponent(svgString)));
+                    const b64Start = 'data:image/svg+xml;base64,';
+                    const image64 = b64Start + svg64;
+                    
+                    // Create and download the image
+                    const img = new Image();
+                    img.onload = function() {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        
+                        // Create download link
+                        const imgURL = canvas.toDataURL('image/png');
+                        const downloadLink = document.createElement('a');
+                        downloadLink.download = 'kalman_filter_workflow.png';
+                        downloadLink.href = imgURL;
+                        downloadLink.style.display = 'none';
+                        document.body.appendChild(downloadLink);
+                        downloadLink.click();
+                        document.body.removeChild(downloadLink);
+                        
+                        statusDiv.textContent = 'Download complete!';
+                        setTimeout(() => {
+                            statusDiv.remove();
+                        }, 3000);
+                    };
+                    
+                    img.onerror = function(err) {
+                        statusDiv.textContent = 'Error loading image: ' + err.message;
+                        console.error('Image loading error:', err);
+                    };
+                    
+                    img.src = image64;
+                } catch (err) {
+                    statusDiv.textContent = 'Error: ' + err.message;
+                    console.error('Download error:', err);
+                }
+            }, 500); // Small delay to ensure the SVG is fully rendered
+        });
+    </script>
+</body>
+</html>
